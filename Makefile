@@ -21,7 +21,7 @@ image:
 	@$(SCRIPTS_DIR)/image.sh
 
 run:
-	@qemu-system-x86_64 -kernel $(KERNEL_DIR)/bzImage -drive file=$(IMAGES_DIR)/update/rootfs.ext2,format=raw -append "root=/dev/sda" -redir tcp:8021::21 -redir tcp:9091::9091
+	@qemu-system-x86_64 -pflash $(SUPPORT_DIR)/ovmf/OVMF.fd -m 128M -cdrom $(IMAGES_DIR)/$(CONFIG_ISO_FILENAME).iso -boot d -vga std
 
 clean:
 	@rm -rf out
