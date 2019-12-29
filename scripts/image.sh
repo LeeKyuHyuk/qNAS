@@ -601,7 +601,7 @@ step "[5/] Generate UEFI Image"
 kernel_size=`du -b $KERNEL_DIR/bzImage | awk '{print \$1}'`
 # Find the initramfs size in bytes.
 rootfs_size=`du -b $IMAGES_DIR/rootfs.cpio.xz | awk '{print \$1}'`
-loader_size=`du -b $SUPPORT_DIR/systemd-boot/EFI/BOOT/BOOTx64.EFI | awk '{print \$1}'`
+loader_size=`du -b $SUPPORT_DIR/systemd-boot/BOOTx64.EFI | awk '{print \$1}'`
 # The EFI boot image is 64KB bigger than the kernel size.
 image_size=$((kernel_size + rootfs_size + loader_size + 65536))
 truncate -s $image_size $IMAGES_DIR/uefi.img
@@ -613,7 +613,7 @@ cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/minimal/x86_64/kernel.xz
 cp -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/minimal/x86_64/rootfs.xz
 step "Copy 'systemd-boot' UEFI Boot Loader"
 mkdir -pv $IMAGES_DIR/uefi/EFI/BOOT
-cp -v $SUPPORT_DIR/systemd-boot/EFI/BOOT/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
+cp -v $SUPPORT_DIR/systemd-boot/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
 step "'systemd-boot' Configuration"
 mkdir -pv $IMAGES_DIR/uefi/loader/entries
 cat > $IMAGES_DIR/uefi/loader/loader.conf << "EOF"
