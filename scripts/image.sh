@@ -605,41 +605,36 @@ loader_size=`du -b $SUPPORT_DIR/systemd-boot/EFI/BOOT/BOOTx64.EFI | awk '{print 
 # The EFI boot image is 64KB bigger than the kernel size.
 image_size=$((kernel_size + rootfs_size + loader_size + 65536))
 truncate -s $image_size $IMAGES_DIR/uefi.img
-LOOP_DEVICE_HDD=$(sudo losetup -f)
-sudo losetup $LOOP_DEVICE_HDD $IMAGES_DIR/uefi.img
-sudo mkfs.vfat $LOOP_DEVICE_HDD
+mkfs.vfat $IMAGES_DIR/uefi.img
 mkdir -pv $IMAGES_DIR/uefi
-sudo mount $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi
 step "Copy Kernel and Root File System"
-sudo mkdir -pv $IMAGES_DIR/uefi/minimal/x86_64
-sudo cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/minimal/x86_64/kernel.xz
-sudo cp -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/minimal/x86_64/rootfs.xz
+mkdir -pv $IMAGES_DIR/uefi/minimal/x86_64
+cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/minimal/x86_64/kernel.xz
+cp -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/minimal/x86_64/rootfs.xz
 step "Copy 'systemd-boot' UEFI Boot Loader"
-sudo mkdir -pv $IMAGES_DIR/uefi/EFI/BOOT
-sudo cp -v $SUPPORT_DIR/systemd-boot/EFI/BOOT/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
+mkdir -pv $IMAGES_DIR/uefi/EFI/BOOT
+cp -v $SUPPORT_DIR/systemd-boot/EFI/BOOT/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
 step "'systemd-boot' Configuration"
-sudo mkdir -pv $IMAGES_DIR/uefi/loader/entries
-cat > $BUILD_DIR/loader.conf << "EOF"
+mkdir -pv $IMAGES_DIR/uefi/loader/entries
+cat > $IMAGES_DIR/uefi/loader/loader.conf << "EOF"
 default mll-x86_64
 timeout 5
 editor 1
 EOF
-sudo cp -v $BUILD_DIR/loader.conf $IMAGES_DIR/uefi/loader/loader.conf
-cat > $BUILD_DIR/mll-x86_64.conf << "EOF"
+cat > $IMAGES_DIR/uefi/loader/entries/mll-x86_64.conf << "EOF"
 title Minimal Linux Live
 version x86_64
 efi /minimal/x86_64/kernel.xz
 options initrd=/minimal/x86_64/rootfs.xz
 EOF
-sudo cp -v $BUILD_DIR/mll-x86_64.conf $IMAGES_DIR/uefi/loader/entries/mll-x86_64.conf
-sync
-sudo umount $IMAGES_DIR/uefi
-sync
-sleep 1
+mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/loader ::loader
+mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/EFI ::EFI
+mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/minimal ::minimal
+
 rm -rf $IMAGES_DIR/uefi
 chmod ugo+r -v $IMAGES_DIR/uefi.img
 mkdir -pv $IMAGES_DIR/isoimage/boot
-cp -v $IMAGES_DIR/uefi.img $IMAGES_DIR/isoimage/boot
+mv -v $IMAGES_DIR/uefi.img $IMAGES_DIR/isoimage/boot
 
 step "[6/] Generate ISO Image"
 extract $SOURCES_DIR/syslinux-6.03.tar.xz $BUILD_DIR
