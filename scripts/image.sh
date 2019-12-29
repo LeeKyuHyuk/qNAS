@@ -590,6 +590,7 @@ chmod 644 -v $IMAGES_DIR/rootfs/var/log/{btmp,lastlog,messages,utmp,wtmp}
 
 step "[3/] Pack Root File System"
 ( cd $IMAGES_DIR/rootfs && find . | cpio -R root:root -H newc -o | xz -9 --check=none > $IMAGES_DIR/rootfs.cpio.xz )
+rm -rf $IMAGES_DIR/rootfs
 
 step "[4/] ISO Overlay Structure"
 mkdir -p $IMAGES_DIR/isoimage/minimal/rootfs
@@ -610,7 +611,7 @@ mkdir -pv $IMAGES_DIR/uefi
 step "Copy Kernel and Root File System"
 mkdir -pv $IMAGES_DIR/uefi/minimal/x86_64
 cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/minimal/x86_64/kernel.xz
-cp -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/minimal/x86_64/rootfs.xz
+mv -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/minimal/x86_64/rootfs.xz
 step "Copy 'systemd-boot' UEFI Boot Loader"
 mkdir -pv $IMAGES_DIR/uefi/EFI/BOOT
 cp -v $SUPPORT_DIR/systemd-boot/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
@@ -644,7 +645,8 @@ xorriso -as mkisofs \
   -e boot/uefi.img \
     -no-emul-boot \
     -isohybrid-gpt-basdat \
-  -o $IMAGES_DIR/minimal_linux_live.iso \
+  -o $IMAGES_DIR/$CONFIG_ISO_FILENAME.iso \
   $IMAGES_DIR/isoimage
+rm -rf $IMAGES_DIR/isoimage
 
 success "\nTotal QNAS image generate time: $(timer $total_build_time)\n"
