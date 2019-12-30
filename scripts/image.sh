@@ -71,6 +71,31 @@ export STRIP="$TOOLS_DIR/bin/$CONFIG_TARGET-strip"
 rm -rf $BUILD_DIR $IMAGES_DIR
 mkdir -pv $BUILD_DIR $IMAGES_DIR
 
+step "[2/] Generate Root File System"
+mkdir -pv $IMAGES_DIR/rootfs/{dev,etc/autorun,lib,mnt,proc,root,sys,tmp,var/log}
+if [[ "$CONFIG_LINUX_ARCH" = "i386" ]] ; then
+    ln -snvf lib $IMAGES_DIR/rootfs/lib32
+fi
+if [[ "$CONFIG_LINUX_ARCH" = "x86_64" ]] ; then
+    ln -snvf lib $IMAGES_DIR/rootfs/lib64
+fi
+
+step "Copy necessary ibrary"
+cp -v $SYSROOT_DIR/lib/libc-2.30.so $IMAGES_DIR/rootfs/lib
+ln -snvf libc-2.30.so $IMAGES_DIR/rootfs/lib/libc.so.6
+cp -v $SYSROOT_DIR/lib/libm-2.30.so $IMAGES_DIR/rootfs/lib
+ln -snvf libm-2.30.so $IMAGES_DIR/rootfs/lib/libm.so.6
+cp -v $SYSROOT_DIR/lib/libresolv-2.30.so $IMAGES_DIR/rootfs/lib
+ln -snvf libresolv-2.30.so $IMAGES_DIR/rootfs/lib/libresolv.so.2
+cp -v $SYSROOT_DIR/lib/ld-2.30.so $IMAGES_DIR/rootfs/lib
+ln -snvf ld-2.30.so $IMAGES_DIR/rootfs/lib/ld-linux-x86-64.so.2
+cp -v $SYSROOT_DIR/lib/libnss_dns-2.30.so $IMAGES_DIR/rootfs/lib
+ln -snvf libnss_dns-2.30.so $IMAGES_DIR/rootfs/lib/libnss_dns.so
+ln -snvf libnss_dns-2.30.so $IMAGES_DIR/rootfs/lib/libnss_dns.so.2
+cp -v $SYSROOT_DIR/lib/libnss_files-2.30.so $IMAGES_DIR/rootfs/lib
+ln -snvf libnss_files-2.30.so $IMAGES_DIR/rootfs/lib/libnss_files.so
+ln -snvf libnss_files-2.30.so $IMAGES_DIR/rootfs/lib/libnss_files.so.2
+
 step "[1/] Busybox 1.31.1"
 extract $SOURCES_DIR/busybox-1.31.1.tar.bz2 $BUILD_DIR
 make -j$PARALLEL_JOBS distclean -C $BUILD_DIR/busybox-1.31.1
@@ -79,12 +104,9 @@ sed -i "s/.*CONFIG_STATIC.*/CONFIG_STATIC=y/" $BUILD_DIR/busybox-1.31.1/.config
 make -j$PARALLEL_JOBS ARCH="$CONFIG_LINUX_ARCH" CROSS_COMPILE="$TOOLS_DIR/bin/$CONFIG_TARGET-" -C $BUILD_DIR/busybox-1.31.1
 make -j$PARALLEL_JOBS ARCH="$CONFIG_LINUX_ARCH" CROSS_COMPILE="$TOOLS_DIR/bin/$CONFIG_TARGET-" CONFIG_PREFIX="$IMAGES_DIR/rootfs" install -C $BUILD_DIR/busybox-1.31.1
 cp -v $BUILD_DIR/busybox-1.31.1/examples/depmod.pl $TOOLS_DIR/bin
-rm -rf $BUILD_DIR/busybox-1.31.1
-
-step "[2/] Generate Root File System"
 # Remove 'linuxrc' which is used when we boot in 'RAM disk' mode.
 rm -fv $IMAGES_DIR/rootfs/linuxrc
-mkdir -pv $IMAGES_DIR/rootfs/{dev,etc/msg,lib,mnt,proc,root,sys,tmp,var/log}
+rm -rf $BUILD_DIR/busybox-1.31.1
 
 # Create /init
 cat > $IMAGES_DIR/rootfs/init << "EOF"
@@ -98,11 +120,11 @@ cat > $IMAGES_DIR/rootfs/init << "EOF"
 #  |
 #  +--(2) /etc/02_overlay.sh
 #          |
-#          +-- /etc/03_init.sh
+#          +-- /etc/02_init.sh
 #               |
 #               +-- /sbin/init
 #                    |
-#                    +--(1) /etc/04_bootscript.sh
+#                    +--(1) /etc/03_bootscript.sh
 #                    |       |
 #                    |       +-- /etc/autorun/* (all scripts)
 #                    |
@@ -121,8 +143,8 @@ echo -e "Welcome to \\e[1mQNAS \\e[32mAbsinthe \\e[0m\\e[1mInstaller\\e[0m (/ini
 
 # Create new mountpoint in RAM, make it our new root location and overlay it
 # with our storage area (if overlay area exists at all). This operation invokes
-# the script '/etc/03_init.sh' as the new init process.
-exec /etc/02_overlay.sh
+# the script '/etc/02_init.sh' as the new init process.
+exec /etc/02_init.sh
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/init
 
@@ -138,11 +160,11 @@ cat > $IMAGES_DIR/rootfs/etc/01_prepare.sh << "EOF"
 #  |
 #  +--(2) /etc/02_overlay.sh
 #          |
-#          +-- /etc/03_init.sh
+#          +-- /etc/02_init.sh
 #               |
 #               +-- /sbin/init
 #                    |
-#                    +--(1) /etc/04_bootscript.sh
+#                    +--(1) /etc/03_bootscript.sh
 #                    |       |
 #                    |       +-- /etc/autorun/* (all scripts)
 #                    |
@@ -170,167 +192,8 @@ echo "Mounted all core filesystems. Ready to continue."
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/etc/01_prepare.sh
 
-# Create /etc/02_overlay.sh
-cat > $IMAGES_DIR/rootfs/etc/02_overlay.sh << "EOF"
-#!/bin/sh
-
-# System initialization sequence:
-#
-# /init
-#  |
-#  +--(1) /etc/01_prepare.sh
-#  |
-#  +--(2) /etc/02_overlay.sh (this file)
-#          |
-#          +-- /etc/03_init.sh
-#               |
-#               +-- /sbin/init
-#                    |
-#                    +--(1) /etc/04_bootscript.sh
-#                    |       |
-#                    |       +-- /etc/autorun/* (all scripts)
-#                    |
-#                    +--(2) /bin/sh (Alt + F1, main console)
-#                    |
-#                    +--(2) /bin/sh (Alt + F2)
-#                    |
-#                    +--(2) /bin/sh (Alt + F3)
-#                    |
-#                    +--(2) /bin/sh (Alt + F4)
-
-# Create the new mountpoint in RAM.
-mount -t tmpfs none /mnt
-
-# Create folders for all critical file systems.
-mkdir /mnt/dev
-mkdir /mnt/sys
-mkdir /mnt/proc
-mkdir /mnt/tmp
-echo "Created folders for all critical file systems."
-
-# Copy root folders in the new mountpoint.
-echo -e "Copying the root file system to \\e[94m/mnt\\e[0m."
-for dir in */ ; do
-    case $dir in
-        dev/)
-            # skip
-        ;;
-        proc/)
-            # skip
-        ;;
-        sys/)
-            # skip
-        ;;
-        mnt/)
-            # skip
-        ;;
-        tmp/)
-            # skip
-        ;;
-        *)
-            cp -a $dir /mnt
-        ;;
-    esac
-done
-
-DEFAULT_OVERLAY_DIR="/tmp/qnas/overlay"
-DEFAULT_UPPER_DIR="/tmp/qnas/rootfs"
-DEFAULT_WORK_DIR="/tmp/qnas/work"
-
-echo "Searching available devices for overlay content."
-for DEVICE in /dev/* ; do
-    DEV=$(echo "${DEVICE##*/}")
-    SYSDEV=$(echo "/sys/class/block/$DEV")
-
-    case $DEV in
-        *loop*) continue ;;
-    esac
-
-    if [ ! -d "$SYSDEV" ] ; then
-        continue
-    fi
-
-    mkdir -p /tmp/mnt/device
-    DEVICE_MNT=/tmp/mnt/device
-
-    OVERLAY_DIR=""
-    OVERLAY_MNT=""
-    UPPER_DIR=""
-    WORK_DIR=""
-
-    mount $DEVICE $DEVICE_MNT 2>/dev/null
-    if [ -d $DEVICE_MNT/qnas/rootfs -a -d $DEVICE_MNT/qnas/work ] ; then
-        # folder
-        echo -e "  Found \\e[94m/qnas\\e[0m folder on device \\e[31m$DEVICE\\e[0m."
-        touch $DEVICE_MNT/qnas/rootfs/qnas.pid 2>/dev/null
-        if [ -f $DEVICE_MNT/qnas/rootfs/qnas.pid ] ; then
-            # read/write mode
-            echo -e "  Device \\e[31m$DEVICE\\e[0m is mounted in read/write mode."
-
-            rm -f $DEVICE_MNT/qnas/rootfs/qnas.pid
-
-            OVERLAY_DIR=$DEFAULT_OVERLAY_DIR
-            OVERLAY_MNT=$DEVICE_MNT
-            UPPER_DIR=$DEVICE_MNT/qnas/rootfs
-            WORK_DIR=$DEVICE_MNT/minimal/work
-        else
-            # read only mode
-            echo -e "  Device \\e[31m$DEVICE\\e[0m is mounted in read only mode."
-
-            OVERLAY_DIR=$DEVICE_MNT/qnas/rootfs
-            OVERLAY_MNT=$DEVICE_MNT
-            UPPER_DIR=$DEFAULT_UPPER_DIR
-            WORK_DIR=$DEFAULT_WORK_DIR
-        fi
-    fi
-
-    if [ "$OVERLAY_DIR" != "" -a "$UPPER_DIR" != "" -a "$WORK_DIR" != "" ] ; then
-        mkdir -p $OVERLAY_DIR
-        mkdir -p $UPPER_DIR
-        mkdir -p $WORK_DIR
-
-        mount -t overlay -o lowerdir=$OVERLAY_DIR:/mnt,upperdir=$UPPER_DIR,workdir=$WORK_DIR none /mnt 2>/dev/null
-
-        OUT=$?
-        if [ ! "$OUT" = "0" ] ; then
-            echo -e "  \\e[31mMount failed (probably on vfat).\\e[0m"
-
-            umount $OVERLAY_MNT 2>/dev/null
-            rmdir $OVERLAY_MNT 2>/dev/null
-
-            rmdir $DEFAULT_OVERLAY_DIR 2>/dev/null
-            rmdir $DEFAULT_UPPER_DIR 2>/dev/null
-            rmdir $DEFAULT_WORK_DIR 2>/dev/null
-        else
-            # All done, time to go.
-            echo -e "  Overlay data from device \\e[31m$DEVICE\\e[0m has been merged."
-            break
-        fi
-    else
-        echo -e "  Device \\e[31m$DEVICE\\e[0m has no proper overlay structure."
-    fi
-
-    umount $DEVICE_MNT 2>/dev/null
-    rm -rf $DEVICE_MNT 2>/dev/null
-done
-
-# Move critical file systems to the new mountpoint.
-mount --move /dev /mnt/dev
-mount --move /sys /mnt/sys
-mount --move /proc /mnt/proc
-mount --move /tmp /mnt/tmp
-echo -e "Mount locations \\e[94m/dev\\e[0m, \\e[94m/sys\\e[0m, \\e[94m/tmp\\e[0m and \\e[94m/proc\\e[0m have been moved to \\e[94m/mnt\\e[0m."
-
-# The new mountpoint becomes file system root. All original root folders are
-# deleted automatically as part of the command execution. The '/sbin/init'
-# process is invoked and it becomes the new PID 1 parent process.
-echo "Switching from initramfs root area to overlayfs root area."
-exec switch_root /mnt /etc/03_init.sh
-EOF
-chmod 755 -v $IMAGES_DIR/rootfs/etc/02_overlay.sh
-
-# Create /etc/03_init.sh
-cat > $IMAGES_DIR/rootfs/etc/03_init.sh << "EOF"
+# Create /etc/02_init.sh
+cat > $IMAGES_DIR/rootfs/etc/02_init.sh << "EOF"
 #!/bin/sh
 
 # System initialization sequence:
@@ -341,11 +204,11 @@ cat > $IMAGES_DIR/rootfs/etc/03_init.sh << "EOF"
 #  |
 #  +--(2) /etc/02_overlay.sh
 #          |
-#          +-- /etc/03_init.sh (this file)
+#          +-- /etc/02_init.sh (this file)
 #               |
 #               +-- /sbin/init
 #                    |
-#                    +--(1) /etc/04_bootscript.sh
+#                    +--(1) /etc/03_bootscript.sh
 #                    |       |
 #                    |       +-- /etc/autorun/* (all scripts)
 #                    |
@@ -372,10 +235,10 @@ cat > $IMAGES_DIR/rootfs/etc/03_init.sh << "EOF"
 echo -e "Executing \\e[32m/sbin/init\\e[0m as PID 1."
 exec /sbin/init
 EOF
-chmod 755 -v $IMAGES_DIR/rootfs/etc/03_init.sh
+chmod 755 -v $IMAGES_DIR/rootfs/etc/02_init.sh
 
-# Create /etc/04_bootscript.sh
-cat > $IMAGES_DIR/rootfs/etc/04_bootscript.sh << "EOF"
+# Create /etc/03_bootscript.sh
+cat > $IMAGES_DIR/rootfs/etc/03_bootscript.sh << "EOF"
 #!/bin/sh
 
 # System initialization sequence:
@@ -386,11 +249,11 @@ cat > $IMAGES_DIR/rootfs/etc/04_bootscript.sh << "EOF"
 #  |
 #  +--(2) /etc/02_overlay.sh
 #          |
-#          +-- /etc/03_init.sh
+#          +-- /etc/02_init.sh
 #               |
 #               +-- /sbin/init
 #                    |
-#                    +--(1) /etc/04_bootscript.sh (this file)
+#                    +--(1) /etc/03_bootscript.sh (this file)
 #                    |       |
 #                    |       +-- /etc/autorun/* (all scripts)
 #                    |
@@ -415,11 +278,33 @@ if [ -d /etc/autorun ] ; then
     done
 fi
 EOF
-chmod 755 -v $IMAGES_DIR/rootfs/etc/04_bootscript.sh
+chmod 755 -v $IMAGES_DIR/rootfs/etc/03_bootscript.sh
+
+
+# Create /etc/03_bootscript.sh
+cat > $IMAGES_DIR/rootfs/etc/04_rc.dhcp << "EOF"
+#!/bin/sh
+
+# This script gets called by udhcpc to setup the network interfaces
+
+ip addr add $ip/$mask dev $interface
+
+if [ "$router" ]; then
+  ip route add default via $router dev $interface
+fi
+
+if [ "$ip" ]; then
+  echo -e "DHCP configuration for device $interface"
+  echo -e "IP:     \\e[1m$ip\\e[0m"
+  echo -e "mask:   \\e[1m$mask\\e[0m"
+  echo -e "router: \\e[1m$router\\e[0m"
+fi
+EOF
+chmod 755 -v $IMAGES_DIR/rootfs/etc/04_rc.dhcp
 
 # Create /etc/inittab
 cat > $IMAGES_DIR/rootfs/etc/inittab << "EOF"
-::sysinit:/etc/04_bootscript.sh
+::sysinit:/etc/03_bootscript.sh
 ::restart:/sbin/init
 ::shutdown:echo -e "\nSyncing all file buffers."
 ::shutdown:sync
@@ -438,6 +323,57 @@ tty4::once:cat /etc/motd
 tty4::respawn:/bin/sh
 EOF
 chmod 644 -v $IMAGES_DIR/rootfs/etc/inittab
+
+# Create /etc/inittab
+cat > $IMAGES_DIR/rootfs/etc/hosts << "EOF"
+# /etc/hosts
+127.0.0.1	localhost
+
+# ipv6
+::1	localhost ipv6-localhost
+EOF
+chmod 644 -v $IMAGES_DIR/rootfs/etc/hosts
+
+# Create /etc/inittab
+cat > $IMAGES_DIR/rootfs/etc/nsswitch.conf << "EOF"
+hosts:		files dns
+EOF
+chmod 644 -v $IMAGES_DIR/rootfs/etc/nsswitch.conf
+
+# Create /etc/inittab
+cat > $IMAGES_DIR/rootfs/etc/resolv.conf << "EOF"
+# The number of active DNS resolvers is limited to 3.
+#
+#   https://linux.die.net/man/5/resolv.conf
+
+# Google Public DNS
+# http://developers.google.com/speed/public-dns
+nameserver 8.8.8.8
+#nameserver 8.8.4.4
+
+# CloudFlare DNS
+# http://blog.cloudflare.com/announcing-1111
+nameserver 1.1.1.1
+#nameserver 1.0.0.1
+
+# Quad9 DNS
+# http://quad9.net
+nameserver 9.9.9.9
+EOF
+chmod 644 -v $IMAGES_DIR/rootfs/etc/resolv.conf
+
+# Create /etc/inittab
+cat > $IMAGES_DIR/rootfs/etc/autorun/20_network.sh << "EOF"
+#!/bin/sh
+
+# DHCP network
+for DEVICE in /sys/class/net/* ; do
+  echo "Found network device ${DEVICE##*/}"
+  ip link set ${DEVICE##*/} up
+  [ ${DEVICE##*/} != lo ] && udhcpc -b -i ${DEVICE##*/} -s /etc/04_rc.dhcp
+done
+EOF
+chmod 755 -v $IMAGES_DIR/rootfs/etc/autorun/20_network.sh
 
 # /etc/motd
 cat > $IMAGES_DIR/rootfs/etc/motd << "EOF"
