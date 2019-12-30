@@ -114,37 +114,16 @@ cat > $IMAGES_DIR/rootfs/init << "EOF"
 #                    |
 #                    +--(2) /bin/sh (Alt + F4)
 
-echo -e "Welcome to \\e[1mMinimal \\e[32mLinux \\e[31mLive\\e[0m (/init)"
+echo -e "Welcome to \\e[1mQNAS \\e[32mAbsinthe \\e[0m\\e[1mInstaller\\e[0m (/init)"
 
 # Let's mount all core file systems.
 /etc/01_prepare.sh
-
-# Print first message on screen.
-cat /etc/msg/init_01.txt
-
-# Wait 5 second or until any keybord key is pressed.
-read -t 5 -n1 -s key
-
-if [ ! "$key" = "" ] ; then
-  # Print second message on screen.
-  cat /etc/msg/init_02.txt
-
-  # Set flag which indicates that we have obtained controlling terminal.
-  export PID1_SHELL=true
-
-  # Interactive shell with controlling tty as PID 1.
-  exec setsid cttyhack sh
-fi
 
 # Create new mountpoint in RAM, make it our new root location and overlay it
 # with our storage area (if overlay area exists at all). This operation invokes
 # the script '/etc/03_init.sh' as the new init process.
 exec /etc/02_overlay.sh
 
-echo "(/init) - you can never see this unless there is a serious bug."
-
-# Wait until any key has been pressed.
-read -n1 -s
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/init
 
@@ -384,11 +363,6 @@ echo -e "Mount locations \\e[94m/dev\\e[0m, \\e[94m/sys\\e[0m, \\e[94m/tmp\\e[0m
 # process is invoked and it becomes the new PID 1 parent process.
 echo "Switching from initramfs root area to overlayfs root area."
 exec switch_root /mnt /etc/03_init.sh
-
-echo "(/etc/02_overlay.sh) - there is a serious bug."
-
-# Wait until any key has been pressed.
-read -n1 -s
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/etc/02_overlay.sh
 
@@ -431,34 +405,9 @@ cat > $IMAGES_DIR/rootfs/etc/03_init.sh << "EOF"
 #
 # exec /sbin/init
 
-# Print first message on screen.
-cat /etc/msg/03_init_01.txt
-
-# Wait 5 second or until any keybord key is pressed.
-read -t 5 -n1 -s key
-
-if [ "$key" = "" ] ; then
-  # Use default initialization logic based on configuration in '/etc/inittab'.
-  echo -e "Executing \\e[32m/sbin/init\\e[0m as PID 1."
-  exec /sbin/init
-else
-  # Print second message on screen.
-  cat /etc/msg/03_init_02.txt
-
-  if [ "$PID1_SHELL" = "true" ] ; then
-    # PID1_SHELL flag is set which means we have controlling terminal.
-    unset PID1_SHELL
-    exec sh
-  else
-    # Interactive shell with controlling tty as PID 1.
-    exec setsid cttyhack sh
-  fi
-fi
-
-echo "(/etc/03_init.sh) - there is a serious bug."
-
-# Wait until any key has been pressed.
-read -n1 -s
+# Use default initialization logic based on configuration in '/etc/inittab'.
+echo -e "Executing \\e[32m/sbin/init\\e[0m as PID 1."
+exec /sbin/init
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/etc/03_init.sh
 
@@ -490,7 +439,7 @@ cat > $IMAGES_DIR/rootfs/etc/04_bootscript.sh << "EOF"
 #                    |
 #                    +--(2) /bin/sh (Alt + F4)
 
-echo -e "Welcome to \\e[1mMinimal \\e[32mLinux \\e[31mLive\\e[0m (/sbin/init)"
+echo -e "Welcome to \\e[1mQNAS \\e[32mAbsinthe \\e[0m\\e[1mInstaller\\e[0m (/sbin/init)"
 
 # Autorun functionality
 if [ -d /etc/autorun ] ; then
@@ -530,59 +479,14 @@ chmod 644 -v $IMAGES_DIR/rootfs/etc/inittab
 # /etc/motd
 cat > $IMAGES_DIR/rootfs/etc/motd << "EOF"
 [0m
-  ###################################
-  #                                 #
-  #  Welcome to [1mMinimal [32mLinux [31mLive[0m  #
-  #                                 #
-  ###################################
+  ########################################
+  #                                      #
+  #  Welcome to [1mQNAS [32mAbsinthe [0m[1mInstaller[0m  #
+  #                                      #
+  ########################################
 [0m
 EOF
 chmod 644 -v $IMAGES_DIR/rootfs/etc/motd
-
-# Create /etc/msg/03_init_01.txt
-cat > $IMAGES_DIR/rootfs/etc/msg/03_init_01.txt << "EOF"
-[1m
-  Press empty key (TAB, SPACE, ENTER) or wait 5 seconds to continue with the
-  system initialization process. Press any other key for PID 1 rescue shell
-  outside of the initramfs area.
-[0m
-EOF
-chmod 644 -v $IMAGES_DIR/rootfs/etc/msg/03_init_01.txt
-
-# Create /etc/msg/03_init_02.txt
-cat > $IMAGES_DIR/rootfs/etc/msg/03_init_02.txt << "EOF"
-[1m  This is PID 1 rescue shell outside of the initramfs area. Execute the
-  following in order to continue with the system initialization:
-[1m[32m
-  exec /sbin/init
-[0m
-EOF
-chmod 644 -v $IMAGES_DIR/rootfs/etc/msg/03_init_02.txt
-
-# Create /etc/msg/init_01.txt
-cat > $IMAGES_DIR/rootfs/etc/msg/init_01.txt << "EOF"
-[1m
-  Press empty key (TAB, SPACE, ENTER) or wait 5 seconds to continue with the
-  overlay initialization process. Press any other key for PID 1 rescue shell
-  inside the initramfs area.
-[0m
-EOF
-chmod 644 -v $IMAGES_DIR/rootfs/etc/msg/init_01.txt
-
-# Create /etc/msg/init_02.txt
-cat > $IMAGES_DIR/rootfs/etc/msg/init_02.txt << "EOF"
-[1m  This is PID 1 rescue shell inside the initramfs area. Execute the following in
-  order to continue with the overlay initialization process:
-[1m[32m
-  exec /etc/02_overlay.sh
-[0m[1m
-  Execute the following in order to skip the overlay initialization and continue
-  directly with the system initialization:
-[1m[32m
-  exec /sbin/init
-[0m
-EOF
-chmod 644 -v $IMAGES_DIR/rootfs/etc/msg/init_02.txt
 
 # Create /var/log/{btmp,lastlog,messages,utmp,wtmp}
 touch $IMAGES_DIR/rootfs/var/log/{btmp,lastlog,messages,utmp,wtmp}
