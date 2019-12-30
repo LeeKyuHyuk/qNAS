@@ -123,7 +123,6 @@ echo -e "Welcome to \\e[1mQNAS \\e[32mAbsinthe \\e[0m\\e[1mInstaller\\e[0m (/ini
 # with our storage area (if overlay area exists at all). This operation invokes
 # the script '/etc/03_init.sh' as the new init process.
 exec /etc/02_overlay.sh
-
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/init
 
@@ -407,13 +406,13 @@ echo -e "Welcome to \\e[1mQNAS \\e[32mAbsinthe \\e[0m\\e[1mInstaller\\e[0m (/sbi
 
 # Autorun functionality
 if [ -d /etc/autorun ] ; then
-for AUTOSCRIPT in /etc/autorun/*
-  do
-    if [ -f "$AUTOSCRIPT" ] && [ -x "$AUTOSCRIPT" ]; then
-      echo -e "Executing \\e[32m$AUTOSCRIPT\\e[0m in subshell."
-      $AUTOSCRIPT
-    fi
-  done
+    for AUTOSCRIPT in /etc/autorun/*
+    do
+        if [ -f "$AUTOSCRIPT" ] && [ -x "$AUTOSCRIPT" ]; then
+            echo -e "Executing \\e[32m$AUTOSCRIPT\\e[0m in subshell."
+            $AUTOSCRIPT
+        fi
+    done
 fi
 EOF
 chmod 755 -v $IMAGES_DIR/rootfs/etc/04_bootscript.sh
@@ -426,7 +425,7 @@ cat > $IMAGES_DIR/rootfs/etc/inittab << "EOF"
 ::shutdown:sync
 ::shutdown:echo "Unmounting all filesystems."
 ::shutdown:umount -a -r
-::shutdown:echo -e "\n  \\e[1mCome back soon. :)\\e[0m\n"
+::shutdown:echo -e "\n  \\e[1mQuit QNAS Installer\\e[0m\n"
 ::shutdown:sleep 1
 ::ctrlaltdel:/sbin/reboot
 ::once:cat /etc/motd
@@ -476,28 +475,28 @@ truncate -s $image_size $IMAGES_DIR/uefi.img
 mkfs.vfat $IMAGES_DIR/uefi.img
 mkdir -pv $IMAGES_DIR/uefi
 step "Copy Kernel and Root File System"
-mkdir -pv $IMAGES_DIR/uefi/minimal/x86_64
-cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/minimal/x86_64/kernel.xz
-mv -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/minimal/x86_64/rootfs.xz
+mkdir -pv $IMAGES_DIR/uefi/qnas/x86_64
+cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/qnas/x86_64/kernel.xz
+mv -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/qnas/x86_64/rootfs.xz
 step "Copy 'systemd-boot' UEFI Boot Loader"
 mkdir -pv $IMAGES_DIR/uefi/EFI/BOOT
 cp -v $SUPPORT_DIR/systemd-boot/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
 step "'systemd-boot' Configuration"
 mkdir -pv $IMAGES_DIR/uefi/loader/entries
 cat > $IMAGES_DIR/uefi/loader/loader.conf << "EOF"
-default mll-x86_64
+default qnas-x86_64
 timeout 5
-editor 1
+editor 0
 EOF
-cat > $IMAGES_DIR/uefi/loader/entries/mll-x86_64.conf << "EOF"
-title Minimal Linux Live
+cat > $IMAGES_DIR/uefi/loader/entries/qnas-x86_64.conf << "EOF"
+title QNAS 1.0.0 (Absinthe) Installer
 version x86_64
-efi /minimal/x86_64/kernel.xz
-options initrd=/minimal/x86_64/rootfs.xz
+efi /qnas/x86_64/kernel.xz
+options initrd=/qnas/x86_64/rootfs.xz
 EOF
 mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/loader ::loader
 mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/EFI ::EFI
-mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/minimal ::minimal
+mcopy -bsp -i $IMAGES_DIR/uefi.img $IMAGES_DIR/uefi/qnas ::qnas
 
 rm -rf $IMAGES_DIR/uefi
 chmod ugo+r -v $IMAGES_DIR/uefi.img
