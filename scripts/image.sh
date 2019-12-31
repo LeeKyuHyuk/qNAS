@@ -71,7 +71,7 @@ export STRIP="$TOOLS_DIR/bin/$CONFIG_TARGET-strip"
 rm -rf $BUILD_DIR $IMAGES_DIR
 mkdir -pv $BUILD_DIR $IMAGES_DIR
 
-step "[2/] Generate Root File System"
+step "[1/9] Generate Root File System"
 mkdir -pv $IMAGES_DIR/rootfs/{dev,etc/autorun,lib,mnt,proc,root,sys,tmp,var/log}
 if [[ "$CONFIG_LINUX_ARCH" = "i386" ]] ; then
     ln -snvf lib $IMAGES_DIR/rootfs/lib32
@@ -80,7 +80,7 @@ if [[ "$CONFIG_LINUX_ARCH" = "x86_64" ]] ; then
     ln -snvf lib $IMAGES_DIR/rootfs/lib64
 fi
 
-step "Copy necessary ibrary"
+step "[2/9] Copy necessary ibrary"
 cp -v $SYSROOT_DIR/lib/libc-2.30.so $IMAGES_DIR/rootfs/lib
 ln -snvf libc-2.30.so $IMAGES_DIR/rootfs/lib/libc.so.6
 cp -v $SYSROOT_DIR/lib/libm-2.30.so $IMAGES_DIR/rootfs/lib
@@ -96,7 +96,7 @@ cp -v $SYSROOT_DIR/lib/libnss_files-2.30.so $IMAGES_DIR/rootfs/lib
 ln -snvf libnss_files-2.30.so $IMAGES_DIR/rootfs/lib/libnss_files.so
 ln -snvf libnss_files-2.30.so $IMAGES_DIR/rootfs/lib/libnss_files.so.2
 
-step "[1/] Busybox 1.31.1"
+step "[3/9] Busybox 1.31.1"
 extract $SOURCES_DIR/busybox-1.31.1.tar.bz2 $BUILD_DIR
 make -j$PARALLEL_JOBS distclean -C $BUILD_DIR/busybox-1.31.1
 make -j$PARALLEL_JOBS ARCH="$CONFIG_LINUX_ARCH" defconfig -C $BUILD_DIR/busybox-1.31.1
@@ -117,8 +117,6 @@ cat > $IMAGES_DIR/rootfs/init << "EOF"
 # /init (this file)
 #  |
 #  +--(1) /etc/01_prepare.sh
-#  |
-#  +--(2) /etc/02_overlay.sh
 #          |
 #          +-- /etc/02_init.sh
 #               |
@@ -157,8 +155,6 @@ cat > $IMAGES_DIR/rootfs/etc/01_prepare.sh << "EOF"
 # /init
 #  |
 #  +--(1) /etc/01_prepare.sh (this file)
-#  |
-#  +--(2) /etc/02_overlay.sh
 #          |
 #          +-- /etc/02_init.sh
 #               |
@@ -201,8 +197,6 @@ cat > $IMAGES_DIR/rootfs/etc/02_init.sh << "EOF"
 # /init
 #  |
 #  +--(1) /etc/01_prepare.sh
-#  |
-#  +--(2) /etc/02_overlay.sh
 #          |
 #          +-- /etc/02_init.sh (this file)
 #               |
@@ -246,8 +240,6 @@ cat > $IMAGES_DIR/rootfs/etc/03_bootscript.sh << "EOF"
 # /init
 #  |
 #  +--(1) /etc/01_prepare.sh
-#  |
-#  +--(2) /etc/02_overlay.sh
 #          |
 #          +-- /etc/02_init.sh
 #               |
@@ -391,15 +383,11 @@ chmod 644 -v $IMAGES_DIR/rootfs/etc/motd
 touch $IMAGES_DIR/rootfs/var/log/{btmp,lastlog,messages,utmp,wtmp}
 chmod 644 -v $IMAGES_DIR/rootfs/var/log/{btmp,lastlog,messages,utmp,wtmp}
 
-step "[3/] Pack Root File System"
+step "[4/9] Pack Root File System"
 ( cd $IMAGES_DIR/rootfs && find . | cpio -R root:root -H newc -o | xz -9 --check=none > $IMAGES_DIR/rootfs.cpio.xz )
 rm -rf $IMAGES_DIR/rootfs
 
-step "[4/] ISO Overlay Structure"
-mkdir -p $IMAGES_DIR/isoimage/qnas/{rootfs,work}
-touch $IMAGES_DIR/isoimage/qnas/rootfs/QNAS_README
-
-step "[5/] Generate UEFI Image"
+step "[5/9] Generate UEFI Image"
 # Find the kernel size in bytes.
 kernel_size=`du -b $KERNEL_DIR/bzImage | awk '{print \$1}'`
 # Find the initramfs size in bytes.
@@ -410,14 +398,14 @@ image_size=$((kernel_size + rootfs_size + loader_size + 65536))
 truncate -s $image_size $IMAGES_DIR/uefi.img
 mkfs.vfat $IMAGES_DIR/uefi.img
 mkdir -pv $IMAGES_DIR/uefi
-step "Copy Kernel and Root File System"
+step "[6/9] Copy Kernel and Root File System"
 mkdir -pv $IMAGES_DIR/uefi/qnas/x86_64
 cp -v $KERNEL_DIR/bzImage $IMAGES_DIR/uefi/qnas/x86_64/kernel.xz
 mv -v $IMAGES_DIR/rootfs.cpio.xz $IMAGES_DIR/uefi/qnas/x86_64/rootfs.xz
-step "Copy 'systemd-boot' UEFI Boot Loader"
+step "[7/9] Copy 'systemd-boot' UEFI Boot Loader"
 mkdir -pv $IMAGES_DIR/uefi/EFI/BOOT
 cp -v $SUPPORT_DIR/systemd-boot/BOOTx64.EFI $IMAGES_DIR/uefi/EFI/BOOT
-step "'systemd-boot' Configuration"
+step "[8/9] 'systemd-boot' Configuration"
 mkdir -pv $IMAGES_DIR/uefi/loader/entries
 cat > $IMAGES_DIR/uefi/loader/loader.conf << "EOF"
 default qnas-x86_64
@@ -439,7 +427,7 @@ chmod ugo+r -v $IMAGES_DIR/uefi.img
 mkdir -pv $IMAGES_DIR/isoimage/boot
 mv -v $IMAGES_DIR/uefi.img $IMAGES_DIR/isoimage/boot
 
-step "[6/] Generate ISO Image"
+step "[9/9] Generate ISO Image"
 extract $SOURCES_DIR/syslinux-6.03.tar.xz $BUILD_DIR
 xorriso -as mkisofs \
   -isohybrid-mbr $BUILD_DIR/syslinux-6.03/bios/mbr/isohdpfx.bin \
