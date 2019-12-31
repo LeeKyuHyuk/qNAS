@@ -39,6 +39,11 @@ function check_environment_variable {
         error "Can't find tools directory!"
         error "Run 'make toolchain'."
     fi
+
+    if ! [[ -d $KERNEL_DIR ]] ; then
+        error "Can't find kernel directory!"
+        error "Run 'make kernel'."
+    fi
 }
 
 function timer {
