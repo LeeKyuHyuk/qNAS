@@ -8,52 +8,52 @@ set -o errexit
 
 # End of optional parameters
 function step() {
-  echo -e "\e[7m\e[1m>>> $1\e[0m"
+    echo -e "\e[7m\e[1m>>> $1\e[0m"
 }
 
 function success() {
-  echo -e "\e[1m\e[32m$1\e[0m"
+    echo -e "\e[1m\e[32m$1\e[0m"
 }
 
 function error() {
-  echo -e "\e[1m\e[31m$1\e[0m"
+    echo -e "\e[1m\e[31m$1\e[0m"
 }
 
 function extract() {
-  case $1 in
-    *.tgz) tar -zxf $1 -C $2 ;;
-    *.tar.gz) tar -zxf $1 -C $2 ;;
-    *.tar.bz2) tar -jxf $1 -C $2 ;;
-    *.tar.xz) tar -Jxf $1 -C $2 ;;
-  esac
+    case $1 in
+        *.tgz) tar -zxf $1 -C $2 ;;
+        *.tar.gz) tar -zxf $1 -C $2 ;;
+        *.tar.bz2) tar -jxf $1 -C $2 ;;
+        *.tar.xz) tar -Jxf $1 -C $2 ;;
+    esac
 }
 
 function check_environment_variable {
-  if ! [[ -d $SOURCES_DIR ]] ; then
-    error "Please download tarball files!"
-    error "Run 'make download'."
-    exit 1
-  fi
+    if ! [[ -d $SOURCES_DIR ]] ; then
+        error "Please download tarball files!"
+        error "Run 'make download'."
+        exit 1
+    fi
 
-  if ! [[ -d $TOOLS_DIR ]] ; then
-    error "Can't find tools directory!"
-    error "Run 'make toolchain'."
-  fi
+    if ! [[ -d $TOOLS_DIR ]] ; then
+        error "Can't find tools directory!"
+        error "Run 'make toolchain'."
+    fi
 }
 
 function timer {
-  if [[ $# -eq 0 ]]; then
-    echo $(date '+%s')
-  else
-    local stime=$1
-    etime=$(date '+%s')
-    if [[ -z "$stime" ]]; then stime=$etime; fi
-    dt=$((etime - stime))
-    ds=$((dt % 60))
-    dm=$(((dt / 60) % 60))
-    dh=$((dt / 3600))
-    printf '%02d:%02d:%02d' $dh $dm $ds
-  fi
+    if [[ $# -eq 0 ]]; then
+        echo $(date '+%s')
+    else
+        local stime=$1
+        etime=$(date '+%s')
+        if [[ -z "$stime" ]]; then stime=$etime; fi
+        dt=$((etime - stime))
+        ds=$((dt % 60))
+        dm=$(((dt / 60) % 60))
+        dh=$((dt / 3600))
+        printf '%02d:%02d:%02d' $dh $dm $ds
+    fi
 }
 
 check_environment_variable
@@ -430,13 +430,13 @@ mv -v $IMAGES_DIR/uefi.img $IMAGES_DIR/isoimage/boot
 step "[9/9] Generate ISO Image"
 extract $SOURCES_DIR/syslinux-6.03.tar.xz $BUILD_DIR
 xorriso -as mkisofs \
-  -isohybrid-mbr $BUILD_DIR/syslinux-6.03/bios/mbr/isohdpfx.bin \
-  -c boot/boot.cat \
-  -e boot/uefi.img \
-    -no-emul-boot \
-    -isohybrid-gpt-basdat \
-  -o $IMAGES_DIR/$CONFIG_ISO_FILENAME.iso \
-  $IMAGES_DIR/isoimage
+-isohybrid-mbr $BUILD_DIR/syslinux-6.03/bios/mbr/isohdpfx.bin \
+-c boot/boot.cat \
+-e boot/uefi.img \
+-no-emul-boot \
+-isohybrid-gpt-basdat \
+-o $IMAGES_DIR/$CONFIG_ISO_FILENAME.iso \
+$IMAGES_DIR/isoimage
 rm -rf $IMAGES_DIR/isoimage
 
 success "\nTotal QNAS image generate time: $(timer $total_build_time)\n"
