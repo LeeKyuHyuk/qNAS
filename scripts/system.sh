@@ -121,6 +121,7 @@ www-data:*:10933:0:99999:7:::
 operator:*:10933:0:99999:7:::
 nobody:*:10933:0:99999:7:::
 EOF
+sed -i -e s,^root:[^:]*:,root:"`$TOOLS_DIR/bin/mkpasswd -m "sha-512" "$CONFIG_ROOT_PASSWD"`":, $ROOTFS_DIR/etc/shadow
 # Create /etc/passwd
 cat > $ROOTFS_DIR/etc/group << "EOF"
 root:x:0:
@@ -150,7 +151,7 @@ netdev:x:82:
 users:x:100:
 nogroup:x:65534:
 EOF
-echo "Welcome to PiCLFS" > $ROOTFS_DIR/etc/issue
+echo "Welcome to QNAS" > $ROOTFS_DIR/etc/issue
 ln -svf /proc/self/mounts $ROOTFS_DIR/etc/mtab
 ln -svf /tmp $ROOTFS_DIR/var/cache
 ln -svf /tmp $ROOTFS_DIR/var/lib/misc
@@ -629,8 +630,8 @@ if [ "${IF_WAIT_DELAY}" -a ! -e "/sys/class/net/${IFACE}" ]; then
 fi
 EOF
 chmod -v 0755 $ROOTFS_DIR/etc/network/if-pre-up.d/wait_iface
-echo "127.0.0.1	localhost" > $ROOTFS_DIR/etc/hosts
-echo "localhost" > $ROOTFS_DIR/etc/hostname
+echo "127.0.0.1	$CONFIG_HOSTNAME" > $ROOTFS_DIR/etc/hosts
+echo "$CONFIG_HOSTNAME" > $ROOTFS_DIR/etc/hostname
 cat > $ROOTFS_DIR/etc/protocols << "EOF"
 # Internet (IP) protocols
 #

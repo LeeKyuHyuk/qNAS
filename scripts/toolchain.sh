@@ -61,7 +61,6 @@ function check_tarballs {
       confuse-3.2.2.tar.xz
       dosfstools-4.1.tar.xz
       e2fsprogs-1.45.4.tar.gz
-      elfutils-0.178.tar.bz2
       fakeroot_1.24.orig.tar.gz
       flex-2.6.3.tar.gz
       gawk-5.0.1.tar.xz
@@ -535,6 +534,9 @@ extract $SOURCES_DIR/openssl-1.1.1d.tar.gz $BUILD_DIR
 make -j$PARALLEL_JOBS -C $BUILD_DIR/openssl-1.1.1d
 make -j$PARALLEL_JOBS install -C $BUILD_DIR/openssl-1.1.1d
 rm -rf $BUILD_DIR/openssl-1.1.1d
+
+step "[24/24] mkpasswd 5.0.26"
+gcc -O2 -I$TOOLS_DIR/include -L$TOOLS_DIR/lib -Wl,-rpath,$TOOLS_DIR/lib $SOURCES_DIR/mkpasswd/mkpasswd.c $SOURCES_DIR/mkpasswd/utils.c -o $TOOLS_DIR/bin/mkpasswd -lcrypt
 
 do_strip
 
